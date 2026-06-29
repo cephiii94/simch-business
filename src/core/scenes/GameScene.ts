@@ -59,6 +59,23 @@ export class GameScene extends Phaser.Scene {
     const grid = this.add.grid(width / 2, height / 2 + 100, width, height - 200, 64, 64, 0x000000, 0, 0xffffff, 0.03);
     grid.setAlpha(0.6);
 
+    // Menggambar 2 Rak Barang (Shelves) di tengah toko secara visual
+    const shelf1 = this.add.rectangle(220, 320, 140, 40, 0x3e2723); // Coklat gelap
+    shelf1.setStrokeStyle(2, 0x8d6e63);
+    this.add.text(220, 320, 'Rak Barang A', {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '11px',
+      color: '#d7ccc8'
+    }).setOrigin(0.5);
+
+    const shelf2 = this.add.rectangle(420, 320, 140, 40, 0x3e2723);
+    shelf2.setStrokeStyle(2, 0x8d6e63);
+    this.add.text(420, 320, 'Rak Barang B', {
+      fontFamily: 'Outfit, sans-serif',
+      fontSize: '11px',
+      color: '#d7ccc8'
+    }).setOrigin(0.5);
+
     // Meja Kasir (Cashier Counter)
     const counter = this.add.rectangle(this.REGISTER_X, this.BASE_Y, 80, 140, 0x5c4033);
     counter.setStrokeStyle(2, 0x8b5a2b);
@@ -320,10 +337,35 @@ export class GameScene extends Phaser.Scene {
       qtyWanted
     };
 
-    this.queue.push(customer);
-    
-    // Animasikan pergerakan pelanggan ke posisi antreannya
-    this.arrangeQueue();
+    // Pilih Rak Barang secara acak
+    const useShelfA = Phaser.Math.Between(0, 1) === 0;
+    const destX = useShelfA ? 220 + Phaser.Math.Between(-30, 30) : 420 + Phaser.Math.Between(-30, 30);
+    const destY = 370;
+
+    // 1. Jalankan pelanggan dari Pintu Masuk ke Rak Barang terpilih
+    this.tweens.add({
+      targets: [graphics, label],
+      x: destX,
+      y: destY,
+      duration: 1200,
+      ease: 'Power2',
+      onComplete: () => {
+        // Tampilkan gelembung pikir "💬" yang menandakan sedang memilih barang
+        const thoughtBubble = this.add.text(destX, destY - 35, '💬', {
+          fontFamily: 'Outfit, sans-serif',
+          fontSize: '12px'
+        }).setOrigin(0.5);
+
+        // Diam selama 1.5 detik memproses pemilihan barang
+        this.time.delayedCall(1500, () => {
+          thoughtBubble.destroy();
+          
+          // Setelah selesai memilih, baru antre di kasir
+          this.queue.push(customer);
+          this.arrangeQueue();
+        });
+      }
+    });
   }
 
   // Mengatur ulang posisi tweens pelanggan di antrean
