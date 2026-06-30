@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import heroImg from '../../assets/hero.png';
 import viteLogo from '../../assets/vite.svg';
 import typescriptLogo from '../../assets/typescript.svg';
+import shelfRackImg from '../../assets/shelf-rack.png';
+import cashierCounterImg from '../../assets/cashier-counter.png';
 import { ASSETS } from '../config/assets.ts';
 import { eventBus, EVENTS } from '../../shared/utils/event-bus.ts';
 
@@ -34,6 +36,8 @@ export class BootScene extends Phaser.Scene {
     this.load.image(ASSETS.IMAGES.LOGO, heroImg);
     this.load.image(ASSETS.IMAGES.VITE, viteLogo);
     this.load.image(ASSETS.IMAGES.TYPESCRIPT, typescriptLogo);
+    this.load.image(ASSETS.IMAGES.SHELF, shelfRackImg);
+    this.load.image(ASSETS.IMAGES.CASHIER, cashierCounterImg);
     
     this.load.on('complete', () => {
       loadingText.destroy();
