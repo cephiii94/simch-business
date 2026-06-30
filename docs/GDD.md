@@ -92,3 +92,15 @@ graph LR
 
 * **Kondisi Kalah (Loss)**: Total kas perusahaan bernilai negatif dan pemain tidak memiliki staf atau stok yang bisa dijual untuk memulihkan arus kas (Kebangkrutan Perusahaan).
 * **Kondisi Menang (Win)**: Berhasil membuka 5 cabang toko yang seluruhnya terotomatisasi penuh (Autopilot) dengan rating kepuasan pelanggan bintang 5.
+
+---
+
+## 6. Rencana Visualisasi Toko Dinamis (Sprint 4)
+
+Untuk mendukung rasa kemajuan (progression) pemain, peningkatan level upgrade fasilitas toko akan divisualisasikan secara dinamis pada Phaser Canvas di Sprint 4:
+* **Kapasitas Gudang**: Area penyimpanan gudang digambar di belakang toko secara visual dengan tumpukan kardus stok yang dinamis (misalnya level 1 memiliki 2 tumpukan, level 3 memiliki 6 tumpukan kardus besar).
+* **Dekorasi Toko (Shop Appeal)**: Penambahan visual kosmetik seperti pot tanaman di pojok ruangan, poster dinding promosi, lampu neon hiasan, dan tekstur lantai ubin mengkilap saat level daya tarik di-upgrade.
+* **Fasilitas Rak & Kasir**:
+  * Rak A dan B (Rak awal) akan terlihat lebih modern (misalnya berubah dari kayu biasa menjadi rak besi modern).
+  * Penambahan unit **Rak Barang C & D** secara fisik di canvas ketika pemain membeli slot ekspansi pajangan stok.
+  * Upgrade meja kasir (misalnya meja kasir kayu berubah menjadi meja kasir modern berpencahayaan neon dan komputer register layar sentuh).

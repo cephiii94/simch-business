@@ -31,3 +31,16 @@ export interface Branch {
   operationalCost: number; // Biaya operasional harian cabang
   dailyRevenueHistory: number[];
 }
+
+export type QuestTargetType = 'BUY_STOCK' | 'SERVE_MANUAL' | 'HIRE_EMPLOYEE' | 'SET_PRICE';
+
+export interface Quest {
+  id: string;
+  title: string;
+  description: string;
+  targetType: QuestTargetType;
+  targetValue: number;
+  currentValue: number;
+  rewardCash: number;
+  isCompleted: boolean;
+}
