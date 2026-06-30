@@ -7,6 +7,9 @@ import { SoundManager } from '../../shared/utils/SoundManager.ts';
 import type { Employee } from '../../shared/types/game.types.ts';
 import { WarehouseVisual } from '../components/WarehouseVisual.ts';
 import { ShelfGroup } from '../components/ShelfGroup.ts';
+import { ASSETS } from '../config/assets.ts';
+import { PlayerCharacter } from '../../features/player/PlayerCharacter.ts';
+import { InteractionZone } from '../../features/player/InteractionZone.ts';
 
 interface VisualCustomer {
   graphics: Phaser.GameObjects.Graphics;
@@ -34,12 +37,25 @@ export class GameScene extends Phaser.Scene {
   private registerGraphics?: Phaser.GameObjects.Graphics;
   private clickIndicator?: Phaser.GameObjects.Text;
 
+  // Asset image game objects
+  private cashierImage?: Phaser.GameObjects.Image;
+  private shelfImages: Phaser.GameObjects.Image[] = [];
+  private fridgeImage?: Phaser.GameObjects.Image;
+  private breakRoomImage?: Phaser.GameObjects.Image;
+  private plantImages: Phaser.GameObjects.Image[] = [];
+  private doorImage?: Phaser.GameObjects.Image;
+
   // Modular visual components
   private shelfA?: ShelfGroup;
   private shelfB?: ShelfGroup;
   private shelfC?: ShelfGroup;
   private shelfD?: ShelfGroup;
   private warehouseVisual?: WarehouseVisual;
+
+  // Player character (owner)
+  private player?: PlayerCharacter;
+  private interactionZones: InteractionZone[] = [];
+  private colliders: Phaser.Geom.Rectangle[] = [];
 
   // Customer queue
   private queue: VisualCustomer[] = [];
@@ -121,34 +137,62 @@ export class GameScene extends Phaser.Scene {
     // 6. Aisle decorations & floor markings
     this.drawDecorations();
 
-    // 7. Click indicator (manual mode)
-    this.clickIndicator = this.add.text(this.REGISTER_X, this.REGISTER_Y - 74, '🛎️ KLIK KASIR', {
-      fontFamily: 'Outfit, sans-serif',
-      fontSize: '13px',
-      color: '#f1c40f',
-      fontStyle: 'bold',
-      stroke: '#000000',
-      strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(10);
-
-    this.tweens.add({
-      targets: this.clickIndicator,
-      alpha: { from: 1, to: 0.25 },
-      duration: 700,
-      yoyo: true,
-      loop: -1,
-    });
-
-    // Invisible interactive area over counter
-    const hitArea = this.add.rectangle(this.REGISTER_X, this.REGISTER_Y, 108, 64, 0x000000, 0)
-      .setInteractive({ useHandCursor: true })
-      .setDepth(20);
-    hitArea.on('pointerdown', () => this.serveCustomerManually());
-
-    // Register graphics placeholder (used for shake animation)
+    // 7. Register graphics placeholder (used for shake animation)
     this.registerGraphics = this.add.graphics();
 
-    // 8. Employee agents & event bus
+    // 8. Build AABB collider rectangles for all solid store objects
+    this.colliders = [
+      new Phaser.Geom.Rectangle(515, 462, 110, 56),  // Kasir
+      new Phaser.Geom.Rectangle(168, 212, 144, 70),  // Rak A
+      new Phaser.Geom.Rectangle(348, 212, 144, 70),  // Rak B
+      new Phaser.Geom.Rectangle(168, 317, 144, 70),  // Rak C
+      new Phaser.Geom.Rectangle(348, 317, 144, 70),  // Rak D
+      new Phaser.Geom.Rectangle(18,  109, 140, 118), // Gudang
+      new Phaser.Geom.Rectangle(595, 100,  90, 148), // Kulkas
+      new Phaser.Geom.Rectangle(19,  546, 138, 118), // Break Room
+    ];
+
+    // 9. Spawn player (owner) di tengah bawah toko
+    this.player = new PlayerCharacter(this, 320, 620);
+
+    // 10. Interaction zones — dekati + klik untuk aksi
+    this.interactionZones = [
+      new InteractionZone(
+        this, this.REGISTER_X, this.REGISTER_Y, 70,
+        'Layani Pelanggan',
+        () => this.serveCustomerManually()
+      ),
+      new InteractionZone(
+        this, this.SHELF_A_X, this.SHELF_A_Y, 65,
+        'Isi Rak Buah & Sayur',
+        () => this.showFloatingText('📦 Rak diisi!', '#2ecc71')
+      ),
+      new InteractionZone(
+        this, this.SHELF_B_X, this.SHELF_B_Y, 65,
+        'Isi Rak Minuman',
+        () => this.showFloatingText('📦 Rak diisi!', '#2ecc71')
+      ),
+      new InteractionZone(
+        this, this.SHELF_C_X, this.SHELF_C_Y, 65,
+        'Isi Rak Snack',
+        () => this.showFloatingText('📦 Rak diisi!', '#2ecc71')
+      ),
+      new InteractionZone(
+        this, this.SHELF_D_X, this.SHELF_D_Y, 65,
+        'Isi Rak Roti & Kue',
+        () => this.showFloatingText('📦 Rak diisi!', '#2ecc71')
+      ),
+      new InteractionZone(
+        this, 88, 168, 70,
+        'Buka Gudang',
+        () => this.showFloatingText('🏭 Buka Sidebar → Ops!', '#3498db')
+      ),
+    ];
+    // Rak C & D tidak aktif sampai di-unlock
+    this.interactionZones[3].setActive(false);
+    this.interactionZones[4].setActive(false);
+
+    // 11. Employee agents & event bus
     this.syncEmployeesFromState();
     eventBus.on(EVENTS.TIME_TICK, this.onTimeTick, this);
     eventBus.on(EVENTS.EMPLOYEE_HIRED, this.onEmployeeHired, this);
@@ -172,9 +216,20 @@ export class GameScene extends Phaser.Scene {
       this.shelfC?.destroy();
       this.shelfD?.destroy();
       this.warehouseVisual?.destroy();
+      this.cashierImage?.destroy();
+      this.shelfImages.forEach(img => img.destroy());
+      this.shelfImages = [];
+      this.fridgeImage?.destroy();
+      this.breakRoomImage?.destroy();
+      this.plantImages.forEach(img => img.destroy());
+      this.plantImages = [];
+      this.doorImage?.destroy();
+      this.player?.destroy();
+      this.interactionZones.forEach(z => z.destroy());
+      this.interactionZones = [];
     });
 
-    // 9. Start game systems
+    // 12. Start game systems
     this.timeSystem.startDay();
     this.scheduleNextCustomerSpawn();
   }
@@ -186,6 +241,18 @@ export class GameScene extends Phaser.Scene {
     this.updateCustomerPatience(delta);
     this.updateWarehouseVisuals();
     this.updateShelfVisuals();
+
+    // Update player movement & collision
+    if (this.player) {
+      this.player.update(delta, this.colliders);
+      // Update interaction zones berdasarkan posisi player
+      const px = this.player.x;
+      const py = this.player.y;
+      this.interactionZones.forEach(zone => zone.update(px, py));
+      // Sync shelf C & D interaction zone dengan unlock state
+      this.interactionZones[3]?.setActive(this.gameState.hasShelfC);
+      this.interactionZones[4]?.setActive(this.gameState.hasShelfD);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -254,34 +321,16 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawFridgeSection(): void {
-    const g = this.add.graphics();
     const FX = 608;
     const FY = 105;
     const FW = 90;
     const FH = 148;
 
-    // Section backing
-    g.fillStyle(0x1a2d3e, 0.78);
-    g.fillRoundedRect(FX, FY, FW, FH, 6);
-
-    // 2 fridge units side by side
-    const FRIDGE_COLORS = [0xe74c3c, 0xf1c40f, 0x2ecc71, 0x3498db, 0xe67e22, 0x9b59b6];
-    for (let i = 0; i < 2; i++) {
-      const rx = FX + 6 + i * 42;
-      // Fridge body
-      g.fillStyle(0x7ec8e3, 0.9);
-      g.fillRect(rx, FY + 6, 34, FH - 14);
-      // Glass door effect
-      g.fillStyle(0xb6def5, 0.75);
-      g.fillRect(rx + 2, FY + 9, 30, FH - 20);
-      // Products inside
-      for (let j = 0; j < 5; j++) {
-        g.fillStyle(FRIDGE_COLORS[(i * 3 + j) % FRIDGE_COLORS.length], 0.9);
-        g.fillRoundedRect(rx + 4, FY + 13 + j * 24, 26, 19, 2);
-      }
-      g.lineStyle(1.5, 0x3498db, 1);
-      g.strokeRect(rx, FY + 6, 34, FH - 14);
-    }
+    // Render kulkas PNG asset
+    this.fridgeImage = this.add.image(FX + FW / 2, FY + FH / 2, ASSETS.IMAGES.FRIDGE)
+      .setDisplaySize(FW, FH)
+      .setOrigin(0.5, 0.5)
+      .setDepth(1);
 
     // Label
     this.add.text(FX + FW / 2, FY - 15, '🧊 Kulkas', {
@@ -290,41 +339,20 @@ export class GameScene extends Phaser.Scene {
       color: '#aed6f1',
       backgroundColor: '#1a2d3e',
       padding: { x: 5, y: 2 },
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(2);
   }
 
   private drawBreakRoom(): void {
-    const g = this.add.graphics();
     const bx = this.WORKER_BREAK_X;
     const by = this.WORKER_BREAK_Y;
     const BW = 138;
     const BH = 118;
 
-    // Room background
-    g.fillStyle(0x1c2b3a, 0.82);
-    g.fillRoundedRect(bx - BW / 2, by - BH / 2, BW, BH, 8);
-    g.lineStyle(2, 0x2e4053, 1);
-    g.strokeRoundedRect(bx - BW / 2, by - BH / 2, BW, BH, 8);
-
-    // Sofa
-    g.fillStyle(0x1f618d, 1);
-    g.fillRoundedRect(bx - 42, by - 10, 84, 32, 7);
-    // Cushions
-    g.fillStyle(0x2e86c1, 0.85);
-    g.fillRoundedRect(bx - 38, by - 7, 34, 24, 5);
-    g.fillRoundedRect(bx + 4, by - 7, 34, 24, 5);
-    // Sofa back
-    g.fillStyle(0x154360, 1);
-    g.fillRoundedRect(bx - 42, by - 22, 84, 14, 4);
-
-    // Coffee table
-    g.fillStyle(0x8d6e63, 1);
-    g.fillRoundedRect(bx - 18, by + 26, 36, 22, 3);
-    // Cup on table
-    g.fillStyle(0xfafafa, 1);
-    g.fillCircle(bx, by + 37, 5);
-    g.fillStyle(0xa0522d, 1);
-    g.fillCircle(bx, by + 37, 3);
+    // Render area istirahat PNG asset
+    this.breakRoomImage = this.add.image(bx, by, ASSETS.IMAGES.BREAK_ROOM)
+      .setDisplaySize(BW, BH)
+      .setOrigin(0.5, 0.5)
+      .setDepth(1);
 
     // Label
     this.add.text(bx, by - BH / 2 - 15, '☕ Area Istirahat', {
@@ -333,92 +361,59 @@ export class GameScene extends Phaser.Scene {
       color: '#7f8c8d',
       backgroundColor: '#1a252f',
       padding: { x: 5, y: 2 },
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(2);
   }
 
   private drawCashierCounter(): void {
-    const g = this.add.graphics();
     const cx = this.REGISTER_X;
     const cy = this.REGISTER_Y;
 
-    // Shadow
-    g.fillStyle(0x000000, 0.22);
-    g.fillRoundedRect(cx - 46, cy - 22, 92, 52, 6);
+    // Drop shadow beneath the counter
+    const shadowG = this.add.graphics().setDepth(2);
+    shadowG.fillStyle(0x000000, 0.20);
+    shadowG.fillEllipse(cx + 4, cy + 38, 120, 22);
 
-    // Counter body (supermarket green)
-    g.fillStyle(0x1e8449, 1);
-    g.fillRoundedRect(cx - 50, cy - 26, 100, 56, 7);
+    // Cashier counter PNG asset
+    this.cashierImage = this.add.image(cx, cy, ASSETS.IMAGES.CASHIER)
+      .setDisplaySize(130, 90)
+      .setOrigin(0.5, 0.5)
+      .setDepth(3);
 
-    // Counter top surface (lighter)
-    g.fillStyle(0x27ae60, 1);
-    g.fillRoundedRect(cx - 48, cy - 24, 96, 52, 6);
+    // "KASIR" sign above the counter
+    const signG = this.add.graphics().setDepth(4);
+    signG.fillStyle(0x1c2833, 1);
+    signG.fillRoundedRect(cx - 32, cy - 58, 64, 20, 4);
+    signG.lineStyle(1.5, 0xf1c40f, 1);
+    signG.strokeRoundedRect(cx - 32, cy - 58, 64, 20, 4);
 
-    // Conveyor belt
-    g.fillStyle(0x7f8c8d, 0.92);
-    g.fillRoundedRect(cx - 36, cy - 15, 54, 14, 3);
-    // Belt lines
-    g.lineStyle(1, 0x566573, 0.55);
-    for (let i = 0; i < 5; i++) {
-      g.moveTo(cx - 33 + i * 11, cy - 15);
-      g.lineTo(cx - 33 + i * 11, cy - 1);
-    }
-    g.strokePath();
-
-    // Cash register
-    g.fillStyle(0x1c2833, 1);
-    g.fillRoundedRect(cx + 20, cy - 18, 24, 20, 3);
-    g.fillStyle(0x2980b9, 1);
-    g.fillRoundedRect(cx + 22, cy - 16, 20, 12, 2);
-    g.fillStyle(0xffffff, 0.55);
-    g.fillCircle(cx + 25, cy - 5, 2);
-    g.fillCircle(cx + 31, cy - 5, 2);
-    g.fillCircle(cx + 37, cy - 5, 2);
-
-    // Counter border
-    g.lineStyle(2, 0x145a32, 1);
-    g.strokeRoundedRect(cx - 50, cy - 26, 100, 56, 7);
-
-    // "KASIR" sign above counter
-    g.fillStyle(0x1c2833, 1);
-    g.fillRoundedRect(cx - 32, cy - 52, 64, 20, 4);
-    g.lineStyle(1.5, 0xf1c40f, 1);
-    g.strokeRoundedRect(cx - 32, cy - 52, 64, 20, 4);
-
-    this.add.text(cx, cy - 42, '💰 KASIR', {
+    this.add.text(cx, cy - 48, '💰 KASIR', {
       fontFamily: 'Outfit, sans-serif',
       fontSize: '10px',
       color: '#f1c40f',
       fontStyle: 'bold',
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(5);
   }
 
   private drawDecorations(): void {
     const g = this.add.graphics();
 
-    // Corner plants
-    this.drawPlant(g, 682, 118);
-    this.drawPlant(g, 682, 695);
-    this.drawPlant(g, 22, 695);
+    // Corner plants — render PNG
+    this.drawPlant(682, 118);
+    this.drawPlant(682, 695);
+    this.drawPlant(22, 695);
 
-    // Entry mat at the bottom
-    g.fillStyle(0x154360, 0.55);
-    g.fillRoundedRect(198, 720, 204, 28, 5);
-    g.lineStyle(2, 0x1a5276, 0.8);
-    g.strokeRoundedRect(198, 720, 204, 28, 5);
-    // Mat stripes
-    g.lineStyle(1.5, 0xffffff, 0.22);
-    for (let i = 0; i < 6; i++) {
-      g.moveTo(210 + i * 30, 720);
-      g.lineTo(210 + i * 30 + 20, 748);
-    }
-    g.strokePath();
+    // Entry mat welcome PNG asset at the bottom
+    this.doorImage = this.add.image(300, 734, ASSETS.IMAGES.DOOR)
+      .setDisplaySize(204, 36)
+      .setOrigin(0.5, 0.5)
+      .setDepth(1);
 
     this.add.text(300, 706, '🚪 MASUK', {
       fontFamily: 'Outfit, sans-serif',
       fontSize: '11px',
       color: '#154360',
       fontStyle: 'bold',
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(2);
 
     // Aisle center lines (solid, low opacity — Phaser Graphics has no native dashes)
     g.lineStyle(2, 0xbdc3c7, 0.22);
@@ -432,25 +427,13 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private drawPlant(g: Phaser.GameObjects.Graphics, x: number, y: number): void {
-    // Pot
-    g.fillStyle(0xcd853f, 1);
-    g.fillRect(x - 11, y, 22, 18);
-    g.fillStyle(0x5d4037, 1);
-    g.fillRect(x - 9, y - 4, 18, 7);
-    // Leaves
-    const colors = [0x27ae60, 0x1e8449, 0x2ecc71, 0x52be80];
-    const leaves = [
-      { dx: 0, dy: -16, r: 13 },
-      { dx: -11, dy: -8, r: 9 },
-      { dx: 11, dy: -8, r: 9 },
-      { dx: -6, dy: -23, r: 8 },
-      { dx: 6, dy: -23, r: 8 },
-    ];
-    leaves.forEach((l, i) => {
-      g.fillStyle(colors[i % colors.length], 1);
-      g.fillCircle(x + l.dx, y + l.dy, l.r);
-    });
+  private drawPlant(x: number, y: number): void {
+    // Render pot tanaman PNG asset
+    const img = this.add.image(x, y, ASSETS.IMAGES.PLANT)
+      .setDisplaySize(38, 48)
+      .setOrigin(0.5, 0.7) // Origin slightly lower to account for visual height
+      .setDepth(2);
+    this.plantImages.push(img);
   }
 
   private drawFloorArrow(g: Phaser.GameObjects.Graphics, x: number, y: number): void {
@@ -613,12 +596,27 @@ export class GameScene extends Phaser.Scene {
         this.gameState.updateBranchReputation(branch.id, -4);
         this.gameState.recordAngryCustomer();
 
+        cust.graphics.scaleX = this.EXIT_X < cust.graphics.x ? -1 : 1;
+        const waddle = this.tweens.add({
+          targets: cust.graphics,
+          angle: { from: -5, to: 5 },
+          scaleY: { from: 1, to: 0.92 },
+          duration: 130,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.easeInOut'
+        });
+
         this.tweens.add({
           targets: [cust.graphics, cust.label],
           x: this.EXIT_X,
           duration: 1000,
           ease: 'Power2',
-          onComplete: () => { cust.graphics.destroy(); cust.label.destroy(); },
+          onComplete: () => {
+            waddle.stop();
+            cust.graphics.destroy();
+            cust.label.destroy();
+          },
         });
 
         this.queue.splice(i, 1);
@@ -728,6 +726,20 @@ export class GameScene extends Phaser.Scene {
     const destX = chosenShelf.x + Phaser.Math.Between(-22, 22);
     const destY = chosenShelf.y + 52; // Just below the shelf
 
+    // Face walking direction
+    graphics.scaleX = destX < graphics.x ? -1 : 1;
+
+    // Waddling walk animation
+    const waddle = this.tweens.add({
+      targets: graphics,
+      angle: { from: -5, to: 5 },
+      scaleY: { from: 1, to: 0.92 },
+      duration: 130,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+
     // Walk from entry (bottom) up to shelf, then queue
     this.tweens.add({
       targets: [graphics, label],
@@ -736,6 +748,10 @@ export class GameScene extends Phaser.Scene {
       duration: 1400,
       ease: 'Power2',
       onComplete: () => {
+        waddle.stop();
+        graphics.setAngle(0);
+        graphics.setScale(graphics.scaleX, 1); // Maintain flip but reset scaleY
+
         const thoughtBubble = this.add.text(destX, destY - 32, '💬', {
           fontFamily: 'Outfit, sans-serif',
           fontSize: '14px',
@@ -792,12 +808,31 @@ export class GameScene extends Phaser.Scene {
   private arrangeQueue(): void {
     this.queue.forEach((cust, index) => {
       const targetX = this.QUEUE_START_X - index * this.QUEUE_SPACING;
+      
+      // Face walking direction
+      cust.graphics.scaleX = targetX < cust.graphics.x ? -1 : 1;
+
+      const waddle = this.tweens.add({
+        targets: cust.graphics,
+        angle: { from: -5, to: 5 },
+        scaleY: { from: 1, to: 0.92 },
+        duration: 130,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut'
+      });
+
       this.tweens.add({
         targets: [cust.graphics, cust.label],
         x: targetX,
         y: this.BASE_Y,
         duration: 800,
         ease: 'Power2',
+        onComplete: () => {
+          waddle.stop();
+          cust.graphics.setAngle(0);
+          cust.graphics.setScale(cust.graphics.scaleX, 1);
+        }
       });
     });
   }
@@ -903,12 +938,27 @@ export class GameScene extends Phaser.Scene {
 
     this.showFloatingText(msgText, msgColor);
 
+    cust.graphics.scaleX = this.EXIT_X < cust.graphics.x ? -1 : 1;
+    const waddle = this.tweens.add({
+      targets: cust.graphics,
+      angle: { from: -5, to: 5 },
+      scaleY: { from: 1, to: 0.92 },
+      duration: 130,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut'
+    });
+
     this.tweens.add({
       targets: [cust.graphics, cust.label],
       x: this.EXIT_X,
       duration: 1000,
       ease: 'Power2',
-      onComplete: () => { cust.graphics.destroy(); cust.label.destroy(); },
+      onComplete: () => {
+        waddle.stop();
+        cust.graphics.destroy();
+        cust.label.destroy();
+      },
     });
 
     this.arrangeQueue();

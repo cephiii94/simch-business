@@ -4,6 +4,12 @@ import viteLogo from '../../assets/vite.svg';
 import typescriptLogo from '../../assets/typescript.svg';
 import shelfRackImg from '../../assets/shelf-rack.png';
 import cashierCounterImg from '../../assets/cashier-counter.png';
+import ownerImg from '../../assets/char-owner.png';
+import fridgeImg from '../../assets/fridge-unit.png';
+import breakRoomImg from '../../assets/break-room.png';
+import plantImg from '../../assets/plant-pot.png';
+import warehouseImg from '../../assets/warehouse-bg.png';
+import doorImg from '../../assets/store-door.png';
 import { ASSETS } from '../config/assets.ts';
 import { eventBus, EVENTS } from '../../shared/utils/event-bus.ts';
 
@@ -38,6 +44,12 @@ export class BootScene extends Phaser.Scene {
     this.load.image(ASSETS.IMAGES.TYPESCRIPT, typescriptLogo);
     this.load.image(ASSETS.IMAGES.SHELF, shelfRackImg);
     this.load.image(ASSETS.IMAGES.CASHIER, cashierCounterImg);
+    this.load.image(ASSETS.IMAGES.OWNER, ownerImg);
+    this.load.image(ASSETS.IMAGES.FRIDGE, fridgeImg);
+    this.load.image(ASSETS.IMAGES.BREAK_ROOM, breakRoomImg);
+    this.load.image(ASSETS.IMAGES.PLANT, plantImg);
+    this.load.image(ASSETS.IMAGES.WAREHOUSE, warehouseImg);
+    this.load.image(ASSETS.IMAGES.DOOR, doorImg);
     
     this.load.on('complete', () => {
       loadingText.destroy();

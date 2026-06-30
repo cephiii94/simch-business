@@ -39,10 +39,6 @@ export class ShelfGroup {
   private stockFillPct: number = 1.0;
   private readonly paletteIdx: number;
 
-  private readonly SHELF_W = 142;
-  private readonly SHELF_BODY_H = 56;
-  private readonly SHELF_TOP_DEPTH = 13;
-
   public readonly x: number;
   public readonly y: number;
 
@@ -54,7 +50,7 @@ export class ShelfGroup {
     this.bodyG = scene.add.graphics();
     this.productG = scene.add.graphics();
 
-    this.signLabel = scene.add.text(x, y - this.SHELF_BODY_H / 2 - this.SHELF_TOP_DEPTH - 18, name, {
+    this.signLabel = scene.add.text(x, y - 59, name, {
       fontFamily: 'Outfit, sans-serif',
       fontSize: '10px',
       color: '#ffffff',
@@ -67,80 +63,62 @@ export class ShelfGroup {
   }
 
   private drawBody(): void {
+    // Dikosongkan karena sudah memakai asset PNG shelf-rack.png dari GameScene
     const g = this.bodyG;
     g.clear();
-    const { x, y, SHELF_W: w, SHELF_BODY_H: bh, SHELF_TOP_DEPTH: td } = this;
-    const hw = w / 2;
-    const top = y - bh / 2;
-
-    // Drop shadow
-    g.fillStyle(0x000000, 0.20);
-    g.fillRect(x - hw + 5, top + 5, w, bh + td);
-
-    // Front face (product display area bg)
-    g.fillStyle(0xf5f0e8, 1);
-    g.fillRect(x - hw, top, w, bh);
-
-    // Shelf divider lines (3 rows)
-    const rowH = bh / 3;
-    g.fillStyle(0xd4aa7d, 1);
-    for (let i = 1; i < 3; i++) {
-      g.fillRect(x - hw, top + i * rowH - 1, w, 2);
-    }
-
-    // Top face (3/4 depth illusion) — darker wood
-    const topPoints = [
-      new Phaser.Math.Vector2(x - hw, top),
-      new Phaser.Math.Vector2(x + hw, top),
-      new Phaser.Math.Vector2(x + hw - 5, top - td),
-      new Phaser.Math.Vector2(x - hw - 5, top - td),
-    ];
-    g.fillStyle(0xb8966a, 1);
-    g.fillPoints(topPoints, true);
-
-    // Shelf frame border
-    g.lineStyle(1.5, 0x8d6e63, 1);
-    g.strokeRect(x - hw, top, w, bh);
-
-    // Vertical side posts
-    g.fillStyle(0xc4934d, 1);
-    g.fillRect(x - hw, top, 5, bh);
-    g.fillRect(x + hw - 5, top, 5, bh);
   }
 
   private drawProducts(): void {
     const g = this.productG;
     g.clear();
-    const { x, y, SHELF_W: w, SHELF_BODY_H: bh } = this;
-    const hw = w / 2;
-    const top = y - bh / 2;
+    const { x, y } = this;
+
     const NUM_ROWS = 3;
     const NUM_COLS = 6;
-    const rowH = bh / NUM_ROWS;
-    const colW = (w - 10) / NUM_COLS;
+    
+    // Y base offset untuk masing-masing dari 3 rak di asset isometrik
+    const BASE_Y = [-23, 2, 25];
+    
+    // Slant slope isometrik untuk shelf-rack.png
+    const SLOPE = -0.255;
+
     const palette = PRODUCT_PALETTES[this.paletteIdx];
     const totalSlots = NUM_ROWS * NUM_COLS;
     const filledSlots = Math.ceil(this.stockFillPct * totalSlots);
 
     for (let row = 0; row < NUM_ROWS; row++) {
+      const baseY = BASE_Y[row];
       for (let col = 0; col < NUM_COLS; col++) {
         const slotIdx = row * NUM_COLS + col;
-        const px = x - hw + 5 + col * colW;
-        const py = top + row * rowH + 2;
-        const pw = colW - 2;
-        const ph = rowH - 5;
+        
+        // Interpolasi posisi X dari kiri ke kanan rak
+        const t = col / (NUM_COLS - 1);
+        const px = x - 48 + t * 90;
+        
+        // Hitung Y sesuai kemiringan isometrik
+        const py = y + baseY + SLOPE * (px - x);
+
+        const prodW = 8;
+        const prodH = 18;
 
         if (slotIdx >= filledSlots) {
-          // Empty slot — faded placeholder
-          g.fillStyle(0xd5d8dc, 0.5);
-          g.fillRoundedRect(px + 1, py + 1, pw - 2, ph - 2, 2);
+          // Slot kosong — tampilkan siluet abu-abu transparan/shadow minimal
+          g.fillStyle(0xd5d8dc, 0.2);
+          g.fillRect(px - prodW / 2, py - prodH, prodW, prodH);
         } else {
           const color = palette[row][col];
+          
+          // Drop shadow kaki produk di rak
+          g.fillStyle(0x000000, 0.12);
+          g.fillEllipse(px, py, prodW + 2, 4);
+
+          // Body produk
           g.fillStyle(color, 1);
-          g.fillRoundedRect(px + 1, py + 1, pw - 2, ph - 2, 2);
-          // Highlight shimmer
-          g.fillStyle(0xffffff, 0.22);
-          g.fillRoundedRect(px + 2, py + 2, pw - 6, 4, 1);
+          g.fillRect(px - prodW / 2, py - prodH, prodW, prodH);
+          
+          // Highlight kilau di bagian kiri produk agar 3D look
+          g.fillStyle(0xffffff, 0.25);
+          g.fillRect(px - prodW / 2 + 1, py - prodH + 1, 2, prodH - 2);
         }
       }
     }

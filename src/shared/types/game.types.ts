@@ -1,6 +1,8 @@
 export type RoleId = 'EMPLOYEE' | 'LEADER' | 'MANAGER' | 'UNASSIGNED';
 export type PersonalityType = 'DILIGENT' | 'FRIENDLY' | 'AMBITIOUS' | 'LAZY';
 export type AgentState = 'COMMUTING' | 'WORKING' | 'BREAKING' | 'LEAVING' | 'SLEEPING';
+export type PlayerState = 'IDLE' | 'WALKING' | 'INTERACTING';
+
 
 export interface Employee {
   id: string;

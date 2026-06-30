@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
+import { ASSETS } from '../config/assets.ts';
 
 /**
  * Renders the warehouse storage zone (top-left of store) using Phaser Graphics API.
  * Shows stacked cardboard boxes that scale with current stock level.
  */
 export class WarehouseVisual {
-  private readonly zoneG: Phaser.GameObjects.Graphics;
+  private readonly bgImage: Phaser.GameObjects.Image;
   private readonly boxG: Phaser.GameObjects.Graphics;
   private readonly titleText: Phaser.GameObjects.Text;
   private readonly stockText: Phaser.GameObjects.Text;
@@ -17,12 +18,15 @@ export class WarehouseVisual {
   private static readonly H = 118;
 
   constructor(scene: Phaser.Scene) {
-    this.zoneG = scene.add.graphics();
-    this.boxG = scene.add.graphics();
+    const { CX, CY, W, H } = WarehouseVisual;
 
-    this.drawZone();
+    // Pallet / warehouse background asset PNG
+    this.bgImage = scene.add.image(CX, CY, ASSETS.IMAGES.WAREHOUSE)
+      .setDisplaySize(W, H)
+      .setOrigin(0.5, 0.5)
+      .setDepth(1);
 
-    const { CX, CY, H } = WarehouseVisual;
+    this.boxG = scene.add.graphics().setDepth(2);
 
     this.titleText = scene.add.text(CX, CY - H / 2 - 15, '📦 GUDANG', {
       fontFamily: 'Outfit, sans-serif',
@@ -31,38 +35,16 @@ export class WarehouseVisual {
       fontStyle: 'bold',
       backgroundColor: '#1a252f',
       padding: { x: 6, y: 3 },
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(3);
 
     this.stockText = scene.add.text(CX, CY + H / 2 + 10, '0 unit', {
       fontFamily: 'Outfit, sans-serif',
       fontSize: '11px',
       color: '#7f8c8d',
-    }).setOrigin(0.5);
+    }).setOrigin(0.5).setDepth(3);
   }
 
-  private drawZone(): void {
-    const g = this.zoneG;
-    g.clear();
-    const { CX: cx, CY: cy, W: w, H: h } = WarehouseVisual;
 
-    // Zone background
-    g.fillStyle(0x1a252f, 0.88);
-    g.fillRoundedRect(cx - w / 2, cy - h / 2, w, h, 8);
-
-    // Zone border
-    g.lineStyle(2, 0x2e4053, 1);
-    g.strokeRoundedRect(cx - w / 2, cy - h / 2, w, h, 8);
-
-    // Corner dots (decoration)
-    g.fillStyle(0x2e4053, 1);
-    const corners = [
-      [cx - w / 2 + 5, cy - h / 2 + 5],
-      [cx + w / 2 - 5, cy - h / 2 + 5],
-      [cx - w / 2 + 5, cy + h / 2 - 5],
-      [cx + w / 2 - 5, cy + h / 2 - 5],
-    ];
-    corners.forEach(([dx, dy]) => g.fillCircle(dx, dy, 3));
-  }
 
   public update(stock: number): void {
     const g = this.boxG;
@@ -109,7 +91,7 @@ export class WarehouseVisual {
   }
 
   public destroy(): void {
-    this.zoneG.destroy();
+    this.bgImage.destroy();
     this.boxG.destroy();
     this.titleText.destroy();
     this.stockText.destroy();
